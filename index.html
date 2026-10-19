@@ -64,6 +64,12 @@
         </select>
         <button id="loadTemplate" type="button" style="margin-top:10px">Gunakan template</button>
 
+        <label for="productEditor" style="margin-top:18px">Edit product list (Template 3)</label>
+        <textarea id="productEditor" style="min-height:180px" placeholder="# Section title
+Product name | label | commission | full URL"></textarea>
+        <button id="updateProducts" type="button" style="margin-top:10px">Update product list</button>
+        <p class="hint">Gunakan satu produk per baris. Format: Name | Label | Commission | URL. Perubahan tersimpan di browser ini.</p>
+
         <label for="message">Pesan HTML</label>
         <textarea id="message" placeholder="Paste HTML email di sini"></textarea>
         <p class="hint">Cek tampilan pesan sebelum dikirim.</p>
@@ -83,6 +89,8 @@
     const message = document.querySelector('#message');
     const template = document.querySelector('#template');
     const loadTemplate = document.querySelector('#loadTemplate');
+    const productEditor = document.querySelector('#productEditor');
+    const updateProducts = document.querySelector('#updateProducts');
     const preview = document.querySelector('#preview');
     const previewFrame = document.querySelector('#previewFrame');
     const apply = document.querySelector('#apply');
@@ -109,12 +117,24 @@
       }
     ];
 
-    const latestProductHtml = latestProductGroups.map(group => `<p><strong>${group.title}</strong></p>
+    let latestProductHtml = latestProductGroups.map(group => `<p><strong>${group.title}</strong></p>
 <ul>${group.products.map(([name, label, commission, url]) => `<li><strong>${name}</strong>${label ? ` — ${label}` : ''}: <a href="${url}">${url}</a> (${commission})</li>`).join('\n')}</ul>`).join('\n');
+
+    function buildLatestTemplate(productHtml) {
+      return `<p>Hi dear! ❤️ Thanks for your interest in our campaigns! 🎉</p>
+<p>I checked your profile and found some products that could be a great fit for your content. <strong>Please see the attachment when requesting products.</strong></p>
+<p>Here are the latest products you can choose from 👇</p>
+${productHtml}
+<p><strong>🎬 TRIAL COLLABORATION</strong></p>
+<p>For this trial, we'd love you to create 5 videos featuring the 2 products you request.</p>
+<p><strong>The best part:</strong><br>✅ No draft approval or revisions<br>✅ Full creative freedom<br>✅ Free product samples<br>✅ Ads support</p>
+<p>Please request 2 products from the list above, then reply with:<br><strong>Done + your TikTok username</strong></p>
+<p>Looking forward to working with you! ❤️</p>`;
+    }
 
     const templates = {
       campaign: `<p>Hi dear! ❤️ Thanks for your interest in our campaigns! 🎉</p>
-<p>I checked your profile and found some products that could be a great fit for your content. Please see the attachment when requesting products.</p>
+<p>I checked your profile and found some products that could be a great fit for your content. <strong>Please see the attachment when requesting products.</strong></p>
 <p>Here are 3 categories you can choose from 👇</p>
 <p><strong>1️⃣ Personal Care</strong></p>
 <p>Great for general personal care content. Includes ads support, trending products, and an average of $8–15 per sale.</p>
@@ -144,22 +164,45 @@
 <p>Please choose 2 products from the attached product list and request the samples.</p>
 <p>After requesting them, reply to this email with:<br><strong>Done + your TikTok username</strong></p>
 <p>Looking forward to working with you! ❤️</p>`,
-      latest: `<p>Hi dear! ❤️ Thanks for your interest in our campaigns! 🎉</p>
-<p>I checked your profile and found some products that could be a great fit for your content. Please see the attachment when requesting products.</p>
-<p>Here are the latest products you can choose from 👇</p>
-${latestProductHtml}
-<p><strong>🎬 TRIAL COLLABORATION</strong></p>
-<p>For this trial, we'd love you to create 5 videos featuring the 2 products you request.</p>
-<p><strong>The best part:</strong><br>✅ No draft approval or revisions<br>✅ Full creative freedom<br>✅ Free product samples<br>✅ Ads support</p>
-<p>Please request 2 products from the list above, then reply with:<br><strong>Done + your TikTok username</strong></p>
-<p>Looking forward to working with you! ❤️</p>`
+      latest: buildLatestTemplate(latestProductHtml)
     };
+
+    const productEditorValue = latestProductGroups.map(group => [`# ${group.title}`, ...group.products.map(([name, label, commission, url]) => `${name} | ${label} | ${commission} | ${url}`)].join('\n')).join('\n');
+    productEditor.value = localStorage.getItem('bulkReplyProducts') || productEditorValue;
+
+    function parseProductEditor(value) {
+      const groups = [];
+      let current;
+      value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).forEach(line => {
+        if (line.startsWith('# ')) {
+          current = { title: line.slice(2), products: [] };
+          groups.push(current);
+          return;
+        }
+        const parts = line.split('|').map(part => part.trim());
+        if (current && parts.length >= 4) current.products.push(parts.slice(0, 4));
+      });
+      return groups.filter(group => group.products.length);
+    }
 
     function refreshPreview() { preview.innerHTML = message.value; }
     message.addEventListener('input', refreshPreview);
     loadTemplate.addEventListener('click', () => {
       message.value = templates[template.value];
       refreshPreview();
+    });
+    updateProducts.addEventListener('click', () => {
+      const groups = parseProductEditor(productEditor.value);
+      if (!groups.length) return status.textContent = 'Format product belum valid.';
+      latestProductHtml = groups.map(group => `<p><strong>${group.title}</strong></p>
+<ul>${group.products.map(([name, label, commission, url]) => `<li><strong>${name}</strong>${label ? ` — ${label}` : ''}: <a href="${url}">${url}</a> (${commission})</li>`).join('\n')}</ul>`).join('\n');
+      templates.latest = buildLatestTemplate(latestProductHtml);
+      localStorage.setItem('bulkReplyProducts', productEditor.value);
+      if (template.value === 'latest') {
+        message.value = templates.latest;
+        refreshPreview();
+      }
+      status.textContent = 'Product list berhasil diperbarui.';
     });
     document.querySelectorAll('[data-device]').forEach(button => {
       button.addEventListener('click', () => {
