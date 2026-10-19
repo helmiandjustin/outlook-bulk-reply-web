@@ -60,6 +60,7 @@
         <select id="template">
           <option value="campaign">Template 1 — Campaign lengkap</option>
           <option value="short">Template 2 — Pesan singkat</option>
+          <option value="latest">Template 3 — Product list terbaru</option>
         </select>
         <button id="loadTemplate" type="button" style="margin-top:10px">Gunakan template</button>
 
@@ -86,6 +87,30 @@
     const previewFrame = document.querySelector('#previewFrame');
     const apply = document.querySelector('#apply');
     const status = document.querySelector('#status');
+
+    const latestProductGroups = [
+      {
+        title: 'Pick Product link TOP Promotion &amp; Hot Selling (Based on TIKTOK Data):',
+        products: [
+          ['Laura Geller Beauty', 'TOP 1 Cosmetics category', '19%', 'https://affiliate-us.tiktok.com/api/v1/share/AJR1ZpsOL2Tx'],
+          ['Missha.official', 'Top 2 Cosmetics Category', '16%', 'https://affiliate-us.tiktok.com/api/v1/share/AJr730r5qXKT'],
+          ['epais', 'TOP 3 selling', '17%', 'https://affiliate-us.tiktok.com/api/v1/share/AJm3Z1gBIGtc'],
+          ['DR.Melaxin eye cream', 'TOP 4', '24%', 'https://affiliate-us.tiktok.com/api/v1/share/AJgq5DuwThqi'],
+          ['DR.Melaxin acne patch', '', '24%', 'https://affiliate-us.tiktok.com/api/v1/share/AJgq5ObngzDG']
+        ]
+      },
+      {
+        title: 'ALL BRAND High Commission:',
+        products: [
+          ['Medicube', 'All product link', '19%', 'https://affiliate-us.tiktok.com/api/v1/share/AJoWb7mq7Igr'],
+          ['COSRX', 'All product link', '29%', 'https://affiliate-us.tiktok.com/api/v1/share/AJoWk2StXIJ3'],
+          ['SKIN1004', 'All product link', '24%', 'https://affiliate-us.tiktok.com/api/v1/share/AJoX6yXB3o1X']
+        ]
+      }
+    ];
+
+    const latestProductHtml = latestProductGroups.map(group => `<p><strong>${group.title}</strong></p>
+<ul>${group.products.map(([name, label, commission, url]) => `<li><strong>${name}</strong>${label ? ` — ${label}` : ''}: <a href="${url}">${url}</a> (${commission})</li>`).join('\n')}</ul>`).join('\n');
 
     const templates = {
       campaign: `<p>Hi dear! ❤️ Thanks for your interest in our campaigns! 🎉</p>
@@ -118,6 +143,15 @@
       short: `<p>Hi dear! ❤️ Thanks for your interest in our campaign! 🎉</p>
 <p>Please choose 2 products from the attached product list and request the samples.</p>
 <p>After requesting them, reply to this email with:<br><strong>Done + your TikTok username</strong></p>
+<p>Looking forward to working with you! ❤️</p>`,
+      latest: `<p>Hi dear! ❤️ Thanks for your interest in our campaigns! 🎉</p>
+<p>I checked your profile and found some products that could be a great fit for your content. Please see the attachment when requesting products.</p>
+<p>Here are the latest products you can choose from 👇</p>
+${latestProductHtml}
+<p><strong>🎬 TRIAL COLLABORATION</strong></p>
+<p>For this trial, we'd love you to create 5 videos featuring the 2 products you request.</p>
+<p><strong>The best part:</strong><br>✅ No draft approval or revisions<br>✅ Full creative freedom<br>✅ Free product samples<br>✅ Ads support</p>
+<p>Please request 2 products from the list above, then reply with:<br><strong>Done + your TikTok username</strong></p>
 <p>Looking forward to working with you! ❤️</p>`
     };
 
