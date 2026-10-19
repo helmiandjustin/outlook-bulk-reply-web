@@ -31,7 +31,14 @@
     .preview-frame.mobile .preview { width: 390px; }
     .preview-frame.tablet .preview { width: 768px; }
     .preview-frame.desktop .preview { width: 100%; }
+    .product-group { margin-top: 14px; padding: 12px; border: 1px solid #e4e7ec; border-radius: 9px; background: #fafbfc; }
+    .product-group-title { margin-bottom: 8px; font-weight: 700; }
+    .product-row { display: grid; grid-template-columns: 1.25fr 1.5fr .65fr 2.5fr auto; gap: 6px; margin-top: 6px; }
+    .product-row input { min-width: 0; padding: 8px; font-size: 12px; }
+    .product-row button { padding: 7px 9px; background: #d92d20; }
+    .product-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
     @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) { .product-row { grid-template-columns: 1fr 1fr; } .product-row input:nth-child(4) { grid-column: 1 / -1; } }
   </style>
 </head>
 <body>
@@ -64,11 +71,13 @@
         </select>
         <button id="loadTemplate" type="button" style="margin-top:10px">Gunakan template</button>
 
-        <label for="productEditor" style="margin-top:18px">Edit product list (Template 3)</label>
-        <textarea id="productEditor" style="min-height:180px" placeholder="# Section title
-Product name | label | commission | full URL"></textarea>
-        <button id="updateProducts" type="button" style="margin-top:10px">Update product list</button>
-        <p class="hint">Gunakan satu produk per baris. Format: Name | Label | Commission | URL. Perubahan tersimpan di browser ini.</p>
+        <label style="margin-top:18px">Edit product list (Template 3)</label>
+        <div id="productRows"></div>
+        <div class="product-editor-actions">
+          <button id="addProduct" type="button">+ Add product</button>
+          <button id="updateProducts" type="button">Update product list</button>
+        </div>
+        <p class="hint">Edit kolomnya langsung. Perubahan tersimpan di browser ini.</p>
 
         <label for="message">Pesan HTML</label>
         <textarea id="message" placeholder="Paste HTML email di sini"></textarea>
@@ -89,7 +98,8 @@ Product name | label | commission | full URL"></textarea>
     const message = document.querySelector('#message');
     const template = document.querySelector('#template');
     const loadTemplate = document.querySelector('#loadTemplate');
-    const productEditor = document.querySelector('#productEditor');
+    const productRows = document.querySelector('#productRows');
+    const addProduct = document.querySelector('#addProduct');
     const updateProducts = document.querySelector('#updateProducts');
     const preview = document.querySelector('#preview');
     const previewFrame = document.querySelector('#previewFrame');
@@ -167,23 +177,38 @@ ${productHtml}
       latest: buildLatestTemplate(latestProductHtml)
     };
 
-    const productEditorValue = latestProductGroups.map(group => [`# ${group.title}`, ...group.products.map(([name, label, commission, url]) => `${name} | ${label} | ${commission} | ${url}`)].join('\n')).join('\n');
-    productEditor.value = localStorage.getItem('bulkReplyProducts') || productEditorValue;
-
-    function parseProductEditor(value) {
-      const groups = [];
-      let current;
-      value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).forEach(line => {
-        if (line.startsWith('# ')) {
-          current = { title: line.slice(2), products: [] };
-          groups.push(current);
-          return;
-        }
-        const parts = line.split('|').map(part => part.trim());
-        if (current && parts.length >= 4) current.products.push(parts.slice(0, 4));
-      });
-      return groups.filter(group => group.products.length);
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     }
+
+    function renderProductEditor(groups) {
+      productRows.innerHTML = groups.map((group, groupIndex) => `<div class="product-group" data-group="${groupIndex}">
+        <input class="product-group-title" data-section-title value="${escapeHtml(group.title)}" aria-label="Section title">
+        ${group.products.map(([name, label, commission, url], productIndex) => `<div class="product-row" data-product="${productIndex}">
+          <input data-field="name" value="${escapeHtml(name)}" placeholder="Product name" aria-label="Product name">
+          <input data-field="label" value="${escapeHtml(label)}" placeholder="Description / ranking" aria-label="Product description">
+          <input data-field="commission" value="${escapeHtml(commission)}" placeholder="19%" aria-label="Commission">
+          <input data-field="url" value="${escapeHtml(url)}" placeholder="https://..." aria-label="Product URL">
+          <button type="button" data-remove-product aria-label="Remove product">×</button>
+        </div>`).join('')}
+      </div>`).join('');
+    }
+
+    function collectProductGroups() {
+      return [...productRows.querySelectorAll('.product-group')].map(group => ({
+        title: group.querySelector('[data-section-title]').value.trim(),
+        products: [...group.querySelectorAll('.product-row')].map(row => [
+          row.querySelector('[data-field="name"]').value.trim(),
+          row.querySelector('[data-field="label"]').value.trim(),
+          row.querySelector('[data-field="commission"]').value.trim(),
+          row.querySelector('[data-field="url"]').value.trim()
+        ]).filter(product => product.every(Boolean))
+      })).filter(group => group.title && group.products.length);
+    }
+
+    let savedProducts = null;
+    try { savedProducts = JSON.parse(localStorage.getItem('bulkReplyProducts') || 'null'); } catch {}
+    renderProductEditor(Array.isArray(savedProducts) && savedProducts.length ? savedProducts : latestProductGroups);
 
     function refreshPreview() { preview.innerHTML = message.value; }
     message.addEventListener('input', refreshPreview);
@@ -192,17 +217,28 @@ ${productHtml}
       refreshPreview();
     });
     updateProducts.addEventListener('click', () => {
-      const groups = parseProductEditor(productEditor.value);
+      const groups = collectProductGroups();
       if (!groups.length) return status.textContent = 'Format product belum valid.';
       latestProductHtml = groups.map(group => `<p><strong>${group.title}</strong></p>
 <ul>${group.products.map(([name, label, commission, url]) => `<li><strong>${name}</strong>${label ? ` — ${label}` : ''}: <a href="${url}">${url}</a> (${commission})</li>`).join('\n')}</ul>`).join('\n');
       templates.latest = buildLatestTemplate(latestProductHtml);
-      localStorage.setItem('bulkReplyProducts', productEditor.value);
+      localStorage.setItem('bulkReplyProducts', JSON.stringify(groups));
       if (template.value === 'latest') {
         message.value = templates.latest;
         refreshPreview();
       }
       status.textContent = 'Product list berhasil diperbarui.';
+    });
+    productRows.addEventListener('click', event => {
+      if (event.target.matches('[data-remove-product]')) event.target.closest('.product-row').remove();
+    });
+    addProduct.addEventListener('click', () => {
+      const group = productRows.querySelector('.product-group');
+      if (!group) return;
+      const row = document.createElement('div');
+      row.className = 'product-row';
+      row.innerHTML = '<input data-field="name" placeholder="Product name" aria-label="Product name"><input data-field="label" placeholder="Description / ranking" aria-label="Product description"><input data-field="commission" placeholder="19%" aria-label="Commission"><input data-field="url" placeholder="https://..." aria-label="Product URL"><button type="button" data-remove-product aria-label="Remove product">×</button>';
+      group.appendChild(row);
     });
     document.querySelectorAll('[data-device]').forEach(button => {
       button.addEventListener('click', () => {
