@@ -211,11 +211,13 @@ ${productHtml}
     renderProductEditor(Array.isArray(savedProducts) && savedProducts.length ? savedProducts : latestProductGroups);
 
     function refreshPreview() { preview.innerHTML = message.value; }
-    message.addEventListener('input', refreshPreview);
-    loadTemplate.addEventListener('click', () => {
+    function useSelectedTemplate() {
       message.value = templates[template.value];
       refreshPreview();
-    });
+    }
+    message.addEventListener('input', refreshPreview);
+    template.addEventListener('change', useSelectedTemplate);
+    loadTemplate.addEventListener('click', useSelectedTemplate);
     updateProducts.addEventListener('click', () => {
       const groups = collectProductGroups();
       if (!groups.length) return status.textContent = 'Format product belum valid.';
